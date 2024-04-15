@@ -13,6 +13,11 @@ echo "Installing Ubuntu updates"
 apt update
 apt -y upgrade
 
+echo "Installing TCMalloc"
+# Either google-perftools or libtcmalloc-minimal4 should do the trick
+# apt install google-perftools
+apt install libtcmalloc-minimal4
+
 echo "Creating and activating venv"
 cd stable-diffusion-webui-forge
 python3 -m venv /workspace/venv
