@@ -43,7 +43,7 @@ RUN ln -s /usr/bin/python3.10 /usr/bin/python
 RUN pip install requests runpod huggingface_hub
 
 # Set Docker image version
-ENV IMAGE_VERSION=1.0.2
+ENV IMAGE_VERSION=1.0.29
 
 # Add RunPod Handler and Docker container start script
 COPY start.sh rp_handler.py ./
