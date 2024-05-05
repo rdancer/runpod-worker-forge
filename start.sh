@@ -21,8 +21,9 @@ my_reboot() {
     echo "$timestamp [$WORKER_ID] Rebooting in $i seconds" >> "$forge_log"
     sleep 1
   done
-  echo "[$WORKER_ID] Rebooting now"
-  echo "$timestamp [$WORKER_ID] Rebooting now" >> "$forge_log"
+  system_id="$(system_id)"
+  echo "[$WORKER_ID] [$system_id] Rebooting now"
+  echo "$timestamp [$WORKER_ID] [$system_id] Rebooting now" >> "$forge_log"
   (sync) || true
   sleep 1 # Let the last log message flush to the log file
   /reboot.sh
@@ -72,13 +73,19 @@ my_logger() {
   done
 }
 
-echo "Initialising new Forge Worker"
+system_id() {
+  nvidia-smi --query-gpu uuid --format csv,noheader || 'No unique system identifier found' # GPU-21afdf49-33cd-9aef-6c88-c77ecd105a75
+}
 
-echo "Symlinking files from Network Volume"
-rm -rf /workspace && \
-  ln -s /runpod-volume /workspace
+{
+  echo "Initialising new Forge Worker"
+  echo "System ID: $(system_id)"
+  echo "Symlinking files from Network Volume"
+  rm -rf /workspace && \
+    ln -s /runpod-volume /workspace
 
-echo "Docker image version: ${IMAGE_VERSION}"
+  echo "Docker image version: ${IMAGE_VERSION}"
+} | my_logger "$forge_log"
 
 if [ -f "/workspace/venv/bin/activate" ]; then
     echo "Starting Stable Diffusion WebUI Forge API"
