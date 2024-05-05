@@ -3,8 +3,38 @@
 forge_log=/workspace/logs/forge.log
 export TZ=Europe/London
 FATAL_ERRORS=(
-  "RuntimeError: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW"
+  # Make sure to break the strings "L""ike this" else when we cat this file to the logs, it will match!
+  "R""untimeError: Unexpected error from cudaGetDeviceCount(). Did you run some cuda functions before calling NumCudaDevices() that might have already set an error? Error 804: forward compatibility was attempted on non supported HW"
 )
+
+# XXX We should take the same worker ID that shows in the runpod UI, it's some kind of a hexadecimal string
+WORKER_ID=${RANDOM:0:1}${RANDOM}
+export WORKER_ID
+
+
+my_reboot() {
+  # Wait for logs to synchronise before rebooting
+  (sync) || true
+  for i in 5 4 3 2 1; do
+    timestamp="$(my_date)"
+    echo "[$WORKER_ID] Rebooting in $i seconds"
+    echo "$timestamp [$WORKER_ID] Rebooting in $i seconds" >> "$forge_log"
+    sleep 1
+  done
+  echo "[$WORKER_ID] Rebooting now"
+  echo "$timestamp [$WORKER_ID] Rebooting now" >> "$forge_log"
+  (sync) || true
+  sleep 1 # Let the last log message flush to the log file
+  /reboot.sh
+}
+
+export time_zone="$(date +'%z')" # +0123
+my_date() {
+  timestamp="$(date +'%Y-%m-%d %H:%M:%S.%3N')"
+  # Truncate nanoseconds to milliseconds and add timezone if known
+  timestamp="${timestamp:0:23}"
+  echo "${timestamp} ${time_zone}"
+}
 
 maybe_reboot() {
   found=false
@@ -17,24 +47,27 @@ maybe_reboot() {
     esac
   done
   if [ "$found" = true ]; then
-    echo "$(date +'%Y-%m-%d %H:%M:%S.%3N') Rebooting due to fatal error: $line" | tee -a "$forge_log"
-    sleep 5 # wait for logs to synchronise before rebooting
-    reboot
+    timestamp="$(my_date)"
+    message="Rebooting due to fatal error"
+    printf '\n[%s] %s: %s\n' "$WORKER_ID" "$message" "$line"
+    printf '\n%s [%s] %s: %s\n' "$timestamp" "$WORKER_ID" "$message" "$line" >> "$forge_log"
+    my_reboot
   fi
 }
-
-
 
 my_logger() {
   # Forces runpod log viewer to show leading spaces -- very useful for stack traces
   zero_width_space="$(echo -ne "\xE2\x80\x8B")"
+  do_not_ignore_leading_whitespace= #"$zero_width_space" # Actually we don't need it, as long as we lead with the $WORKER_ID -- and it creates garbage in the runpod UI log viewer (the React one, not the terminal-like one)
   log_file="$1"
 
-  # Print the log to stdout and the log file
+  # Make sure we never block ever
+  # The default size is 64kB on Linux, which is easily insufficient for some of the base64-encoded images that we love to log
   while IFS='' read -r line; do
-    timestamp="$(date +'%Y-%m-%d %H:%M:%S.%3N')"
-    printf '%s%s\n' "$zero_width_space" "$line"
-    printf '%s %s\n' "$timestamp" "$line" >> "$log_file"
+    # Print the log to stdout and the log file
+    timestamp="$(my_date)"
+    printf '%s[%s] %s\n' "$do_not_ignore_leading_whitespace" "$WORKER_ID" "$line"
+    printf '%s [%s] %s\n' "$timestamp" "$WORKER_ID" "$line" >> "$log_file"
     maybe_reboot "$line"
   done
 }

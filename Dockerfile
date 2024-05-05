@@ -43,12 +43,12 @@ RUN ln -s /usr/bin/python3.10 /usr/bin/python
 RUN pip install requests runpod huggingface_hub
 
 # Set Docker image version
-ENV IMAGE_VERSION=1.0.29
+ENV IMAGE_VERSION=1.0.44
 
-# Add RunPod Handler and Docker container start script
-COPY start.sh rp_handler.py ./
+# Add RunPod Handler and Docker scripts
+COPY start.sh reboot.sh rp_handler.py ./
 COPY schemas /schemas
 
 # Start the container
-RUN chmod +x /start.sh
+RUN chmod +x /start.sh /reboot.sh
 ENTRYPOINT /start.sh
